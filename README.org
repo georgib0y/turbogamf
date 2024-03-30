@@ -1,0 +1,91 @@
+#-*- mode: org -*-
+#+title: TurBoGamF
+
+* TurBoGamF
+TUNn-based BOard GAMe Framework
+
+** Introduction
+*** What is it?
+A framework for setting up and simulating a range of board games, either by declaring bot logic or playing as humans
+Could be extended to card games as well
+
+*** End Goals
+Being able to simulate a wide variety of turn-based board and card games
+- Uno
+  - simple card game rules
+
+- Connect-4
+  - a simple 2-player board? game
+
+- Monopoly
+  - a long winded but relatively simple board game
+
+- Battleship
+  - a more complicated 2-player board? game with two phases (setup and play)
+
+- Poker
+  - card game that involves more states and phases as well as different players
+
+- Axis and Allies?
+  - a long winded complex board game with multiple phases
+
+*** How will it work?
+Turbogamf will work by initialising board and player state, managing player turns along with their state and game logic
+The framework/engine will be responsible for running the game by simulating the bot moves and allowing for input from the humans
+
+**** Expected Usage
+- Start by defining a game/board template
+  - State
+    The data structure of the board and the objects in the game
+  - Logic/Conditions
+    Any actions/phases the board itself needs to take/change when a condition is met
+
+- Then define player templates
+  - Define player state
+    Define the state of each type of player
+
+  - Define the actions
+    What actions each player goes through on their turn and what kind of inputs each action needs
+
+- Defining conditions for winning
+
+- Initialise game state
+  Give players what they need to start and also initialise the board state
+
+- Run game
+  running each players turn until the winning condition has been met
+
+** Component Breakdown
+*** Components
+- Game State
+  - Phases
+- Game Logic
+  - Rule sets
+- Player Input
+  - Humans/Bots
+- Player State
+- Player Logic/Actions
+
+*** Examples
+**** Uno
+- Game template
+  - State
+    Cards - colours, numbers, special cards
+    Two piles, one for pickup and one to put down
+  - Logic/Conditions
+    If the pickup pile is empty then reshuffle all the cards but the top one from the put down deck and put them in the pickup deck
+
+- Player template
+  - State
+    Hand - where the players cards are stored
+  - Phases
+    Pickup - if no cards can be played or the previous player has placed down a pickup 2/4 card then the player needs to pick up (this is a conditional rule that requires no user input)
+    Put down - if not just picked up (or if pickup put down is a rule then just if picked up from a +2/4) the player must put down a card (a conditional rule that requires input)
+
+    Calling out uno - a limitation of this framework is that it will not allow for functionality that skips a turn such as any player calling out someone not saying uno
+
+- Winning conditions
+  When one player has run out of cards they win
+
+- Initialise game state
+  All cards are placed in the pickup deck, 7 cards are then dealt to each player
