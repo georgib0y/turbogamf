@@ -1,7 +1,4 @@
-#-*- mode: org -*-
 #+title: TurBoGamF
-
-* TurBoGamF
 TUNn-based BOard GAMe Framework
 
 ** Introduction
