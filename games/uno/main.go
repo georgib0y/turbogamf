@@ -7,10 +7,11 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
-	numPlayers := 2
+	numPlayers := 3
 
 	g := NewUnoGame(numPlayers)
 
@@ -35,6 +36,7 @@ var colourStrings map[colour]string = map[colour]string{
 	GREEN:  "GREEN",
 	BLUE:   "BLUE",
 	YELLOW: "YELLOW",
+	WILD:   "WILD",
 }
 
 func (c colour) String() string {
@@ -42,6 +44,7 @@ func (c colour) String() string {
 	if !ok {
 		panic(fmt.Sprintf("Unknown colour with value %d", int(c)))
 	}
+
 	return s
 }
 
@@ -82,6 +85,10 @@ type UnoCard struct {
 
 func (c UnoCard) CanPlaceOn(o UnoCard) bool {
 	return c.c == WILD || c.c == o.c || c.t == o.t
+}
+
+func (c UnoCard) String() string {
+	return fmt.Sprintf("%s\t%s", c.c, c.t)
 }
 
 type UnoDeck []UnoCard
@@ -148,27 +155,73 @@ func (d *UnoDeck) Shuffle() {
 	})
 }
 
-func PromptCardChoice(options map[int]UnoCard) (int, error) {
+func (d UnoDeck) IsEmpty() bool {
+	return len(d) == 0
+}
+
+func PromptCardChoice(options map[int]UnoCard) int {
+	fmt.Println("--- Available Cards ---")
 	for i, c := range options {
-		fmt.Printf("[%d]: %s\t%s\n", i, c.c, c.t)
+		fmt.Printf("[%d]: %s\n", i, c)
 	}
 
 	for {
-		fmt.Printf("Please choose an option [0 - %d]: ", len(options)-1)
+		fmt.Print("Please choose an option: ")
 
 		reader := bufio.NewReader(os.Stdin)
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			return 0, err
+			panic(err)
 		}
 
-		idx, err := strconv.Atoi(input)
+		idx, err := strconv.Atoi(strings.TrimSpace(input))
 
-		if err != nil || idx < 0 || idx >= len(options) {
+		if err != nil {
+			log.Println(err)
+			continue
+		} else if idx < 0 {
+			log.Printf("Input cannot be negativeL %d\n", idx)
 			continue
 		}
 
-		return idx, nil
+		if _, ok := options[idx]; !ok {
+			log.Printf("Input not a valid option: %d\n", idx)
+			continue
+		}
+
+		fmt.Println()
+		return idx
+	}
+}
+
+func PromptColourChoice() colour {
+	fmt.Println("--- Change Colour To ---")
+	colours := []colour{RED, GREEN, BLUE, YELLOW}
+	for i, c := range colours {
+		fmt.Printf("[%d]: %v\n", i, c)
+	}
+
+	for {
+		fmt.Print("Please choose an option: ")
+
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+
+		idx, err := strconv.Atoi(strings.TrimSpace(input))
+
+		if err != nil {
+			log.Println(err)
+			continue
+		} else if idx < 0 || idx >= len(colours) {
+			log.Printf("Input out of colour range (0-%d): %d", len(colours), idx)
+			continue
+		}
+
+		fmt.Println()
+		return colours[idx]
 	}
 }
 
@@ -196,6 +249,8 @@ func NewUnoGame(n int) *UnoGame {
 		winner:  make(chan int),
 		reverse: false,
 	}
+
+	g.pickup.Shuffle()
 
 	// start each player off with 7 cards each
 	for i := range g.players {
@@ -235,24 +290,48 @@ func (g *UnoGame) Run() {
 	pIdx := 0
 
 	for {
+		fmt.Printf("------\nPLAYER: %d\nCurrent Card is: %s\nCards Left: %d\n------\n\n", pIdx, g.putdown.Top(), len(g.players[pIdx].hand))
+
 		card, ok := g.ChooseCard(pIdx)
 
+		if g.players[pIdx].hand.IsEmpty() {
+			g.winner <- pIdx
+			close(g.winner)
+			return
+		}
+
 		if !ok {
+			fmt.Printf("No cards available - picking up\n\n")
 			g.Deal(pIdx)
 			pIdx = g.nextPlayerIdx(pIdx)
 			continue
 		}
 
+		fmt.Printf("Placing down %s\n\n", card)
 		g.putdown.Push(card)
 
-		switch g.putdown.Top().t {
+		switch card.t {
 		case REVERSE:
 			g.reverse = !g.reverse
 		case SKIP:
+			// move the index along one more than usual
 			pIdx = g.nextPlayerIdx(pIdx)
 		}
 
 		pIdx = g.nextPlayerIdx(pIdx)
+
+		toDeal := 0
+		switch card.t {
+		case PLUS2:
+			toDeal = 2
+		case PLUS4:
+			toDeal = 4
+		}
+
+		for i := 0; i < toDeal; i++ {
+			g.Deal(pIdx)
+			log.Printf("Dealt card to player %d\n", pIdx)
+		}
 	}
 }
 
@@ -270,12 +349,16 @@ func (g *UnoGame) ChooseCard(pIdx int) (UnoCard, bool) {
 		return UnoCard{}, false
 	}
 
-	idx, err := PromptCardChoice(options)
-	if err != nil {
-		panic(err)
+	idx := PromptCardChoice(options)
+	card := g.players[pIdx].hand.PopAt(idx)
+
+	// if player has picked a new colour card, change the colour of the wild card to the chosen colour
+	if card.c == WILD {
+		newCol := PromptColourChoice()
+		card.c = newCol
 	}
 
-	return g.players[pIdx].hand.PopAt(idx), true
+	return card, true
 }
 
 func (g *UnoGame) Pickup() UnoCard {
